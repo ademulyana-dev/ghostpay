@@ -1741,6 +1741,9 @@ function TokensTab({ tokens, balances, address }: any) {
 function HistoryTab({ address, tokens }: any) {
   const [history, setHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [filterType, setFilterType] = useState<'All' | 'Send' | 'Receive' | 'Refund'>('All');
+  const [filterStatus, setFilterStatus] = useState<'All' | 'Success' | 'Failed'>('All');
+  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest' | 'amount_desc' | 'amount_asc'>('newest');
 
   useEffect(() => {
     const fetchHistory = async () => {
@@ -1868,88 +1871,179 @@ function HistoryTab({ address, tokens }: any) {
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Transaction History</h2>
         <p className="text-gray-500 text-sm mb-6">Your past sends, receives, and refunds on GhostPay.</p>
 
-        {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-8 h-8 animate-spin text-[#ff3300]" />
+        {/* Filters & Sort */}
+        <div className="flex flex-col sm:flex-row gap-3 mb-6">
+          {/* Type filter */}
+          <div className="flex items-center gap-1.5 bg-gray-100 rounded-xl p-1">
+            {(['All', 'Send', 'Receive', 'Refund'] as const).map(t => (
+              <button
+                key={t}
+                onClick={() => setFilterType(t)}
+                className={cn(
+                  "px-3 py-1.5 rounded-lg text-xs font-bold transition-all",
+                  filterType === t
+                    ? t === 'Send' ? "bg-blue-600 text-white shadow-sm"
+                      : t === 'Receive' ? "bg-emerald-600 text-white shadow-sm"
+                      : t === 'Refund' ? "bg-amber-500 text-white shadow-sm"
+                      : "bg-white text-gray-900 shadow-sm"
+                    : "text-gray-500 hover:text-gray-700"
+                )}
+              >
+                {t}
+              </button>
+            ))}
           </div>
-        ) : history.length === 0 ? (
-          <div className="text-center py-10 bg-[#f9f9f9] rounded-2xl border border-gray-200">
-            <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 border border-gray-100 shadow-sm">
-              <History className="w-8 h-8 text-gray-400" />
+
+          {/* Status filter */}
+          <div className="flex items-center gap-1.5 bg-gray-100 rounded-xl p-1">
+            {(['All', 'Success', 'Failed'] as const).map(s => (
+              <button
+                key={s}
+                onClick={() => setFilterStatus(s)}
+                className={cn(
+                  "px-3 py-1.5 rounded-lg text-xs font-bold transition-all",
+                  filterStatus === s
+                    ? s === 'Success' ? "bg-green-600 text-white shadow-sm"
+                      : s === 'Failed' ? "bg-red-600 text-white shadow-sm"
+                      : "bg-white text-gray-900 shadow-sm"
+                    : "text-gray-500 hover:text-gray-700"
+                )}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+
+          {/* Sort */}
+          <div className="sm:ml-auto">
+            <select
+              value={sortOrder}
+              onChange={e => setSortOrder(e.target.value as typeof sortOrder)}
+              className="text-xs font-bold bg-gray-100 border border-gray-200 rounded-xl px-3 py-2 text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#ff3300] cursor-pointer"
+            >
+              <option value="newest">Newest First</option>
+              <option value="oldest">Oldest First</option>
+              <option value="amount_desc">Amount (High → Low)</option>
+              <option value="amount_asc">Amount (Low → High)</option>
+            </select>
+          </div>
+        </div>
+
+        {(() => {
+          const filtered = history
+            .filter(tx => filterType === 'All' || tx.type === filterType)
+            .filter(tx => filterStatus === 'All' || tx.status === filterStatus)
+            .sort((a, b) => {
+              if (sortOrder === 'newest') return b.timestamp - a.timestamp;
+              if (sortOrder === 'oldest') return a.timestamp - b.timestamp;
+              const aAmt = Number(a.amount) || 0;
+              const bAmt = Number(b.amount) || 0;
+              return sortOrder === 'amount_desc' ? bAmt - aAmt : aAmt - bAmt;
+            });
+
+          if (loading) return (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-[#ff3300]" />
             </div>
-            <h4 className="text-base font-bold text-gray-900 mb-1">No transactions found</h4>
-            <p className="text-sm text-gray-500">You haven't made any transactions yet.</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto rounded-2xl border border-gray-200 shadow-sm">
-            <table className="w-full text-sm text-left text-gray-500 whitespace-nowrap">
-              <thead className="text-xs text-gray-700 uppercase bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th scope="col" className="px-6 py-4 font-bold">Txn Hash</th>
-                  <th scope="col" className="px-6 py-4 font-bold">Method</th>
-                  <th scope="col" className="px-6 py-4 font-bold">Block</th>
-                  <th scope="col" className="px-6 py-4 font-bold">Time</th>
-                  <th scope="col" className="px-6 py-4 font-bold">From</th>
-                  <th scope="col" className="px-6 py-4 font-bold">To</th>
-                  <th scope="col" className="px-6 py-4 font-bold">Value</th>
-                  <th scope="col" className="px-6 py-4 font-bold">Txn Fee</th>
-                </tr>
-              </thead>
-              <tbody>
-                {history.map((tx, i) => (
-                  <tr key={i} className="bg-white border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 font-mono text-[#ff3300] hover:text-[#e62e00]">
-                      <a href={`${EXPLORER_URL}/tx/${tx.hash}`} target="_blank" rel="noreferrer" className="flex items-center gap-1">
-                        {tx.hash ? `${tx.hash.slice?.(0, 10) || tx.hash}...${tx.hash.slice?.(-8) || ''}` : 'Unknown'}
-                      </a>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={cn(
-                        "px-2.5 py-1 rounded-md text-xs font-bold border",
-                        tx.type === 'Send' ? "bg-blue-50 text-blue-700 border-blue-200" : 
-                        tx.type === 'Receive' ? "bg-emerald-50 text-emerald-700 border-emerald-200" : 
-                        "bg-amber-50 text-amber-700 border-amber-200"
-                      )}>
-                        {tx.type}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 font-mono text-[#ff3300] hover:text-[#e62e00]">
-                      <a href={`${EXPLORER_URL}/block/${tx.blockNumber}`} target="_blank" rel="noreferrer">
-                        {tx.blockNumber || '-'}
-                      </a>
-                    </td>
-                    <td className="px-6 py-4">
-                      {tx.timestamp ? new Date(tx.timestamp).toLocaleString(undefined, {
-                        year: 'numeric', month: 'short', day: 'numeric',
-                        hour: '2-digit', minute: '2-digit', second: '2-digit'
-                      }) : '-'}
-                    </td>
-                    <td className="px-6 py-4 font-mono">
-                      {tx.from ? (
-                        <a href={`${EXPLORER_URL}/address/${tx.from}`} target="_blank" rel="noreferrer" className="text-[#ff3300] hover:text-[#e62e00]">
-                          {tx.from.toLowerCase() === address?.toLowerCase() ? 'You' : `${tx.from.slice?.(0, 8) || tx.from}...${tx.from.slice?.(-6) || ''}`}
-                        </a>
-                      ) : '-'}
-                    </td>
-                    <td className="px-6 py-4 font-mono">
-                      {tx.to ? (
-                        <a href={`${EXPLORER_URL}/address/${tx.to}`} target="_blank" rel="noreferrer" className="text-[#ff3300] hover:text-[#e62e00]">
-                          {tx.to.toLowerCase() === CONTRACT_ADDRESS.toLowerCase() ? 'GhostPay' : `${tx.to.slice?.(0, 8) || tx.to}...${tx.to.slice?.(-6) || ''}`}
-                        </a>
-                      ) : '-'}
-                    </td>
-                    <td className="px-6 py-4 font-bold text-gray-900">
-                      {tx.type === 'Send' ? '-' : '+'}{tx.amount ? Number(tx.amount).toFixed(4) : '???'} {tx.symbol || 'Tokens'}
-                    </td>
-                    <td className="px-6 py-4 text-xs text-gray-400">
-                      {tx.fee ? Number(tx.fee).toFixed(6) : '0'} ETH
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+          );
+
+          if (filtered.length === 0) return (
+            <div className="text-center py-10 bg-[#f9f9f9] rounded-2xl border border-gray-200">
+              <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 border border-gray-100 shadow-sm">
+                <History className="w-8 h-8 text-gray-400" />
+              </div>
+              <h4 className="text-base font-bold text-gray-900 mb-1">
+                {history.length === 0 ? 'No transactions found' : 'No matching transactions'}
+              </h4>
+              <p className="text-sm text-gray-500">
+                {history.length === 0 ? "You haven't made any transactions yet." : 'Try adjusting your filters.'}
+              </p>
+            </div>
+          );
+
+          return (
+            <>
+              <p className="text-xs text-gray-400 mb-3">{filtered.length} transaction{filtered.length !== 1 ? 's' : ''} found</p>
+              <div className="overflow-x-auto rounded-2xl border border-gray-200 shadow-sm">
+                <table className="w-full text-sm text-left text-gray-500 whitespace-nowrap">
+                  <thead className="text-xs text-gray-700 uppercase bg-gray-50 border-b border-gray-200">
+                    <tr>
+                      <th scope="col" className="px-6 py-4 font-bold">Txn Hash</th>
+                      <th scope="col" className="px-6 py-4 font-bold">Method</th>
+                      <th scope="col" className="px-6 py-4 font-bold">Status</th>
+                      <th scope="col" className="px-6 py-4 font-bold">Block</th>
+                      <th scope="col" className="px-6 py-4 font-bold">Time</th>
+                      <th scope="col" className="px-6 py-4 font-bold">From</th>
+                      <th scope="col" className="px-6 py-4 font-bold">To</th>
+                      <th scope="col" className="px-6 py-4 font-bold">Value</th>
+                      <th scope="col" className="px-6 py-4 font-bold">Txn Fee</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filtered.map((tx, i) => (
+                      <tr key={i} className="bg-white border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                        <td className="px-6 py-4 font-mono text-[#ff3300] hover:text-[#e62e00]">
+                          <a href={`${EXPLORER_URL}/tx/${tx.hash}`} target="_blank" rel="noreferrer" className="flex items-center gap-1">
+                            {tx.hash ? `${tx.hash.slice?.(0, 10) || tx.hash}...${tx.hash.slice?.(-8) || ''}` : 'Unknown'}
+                          </a>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={cn(
+                            "px-2.5 py-1 rounded-md text-xs font-bold border",
+                            tx.type === 'Send' ? "bg-blue-50 text-blue-700 border-blue-200" :
+                            tx.type === 'Receive' ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                            "bg-amber-50 text-amber-700 border-amber-200"
+                          )}>
+                            {tx.type}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={cn(
+                            "px-2.5 py-1 rounded-md text-xs font-bold border",
+                            tx.status === 'Success' ? "bg-green-50 text-green-700 border-green-200" : "bg-red-50 text-red-700 border-red-200"
+                          )}>
+                            {tx.status || 'Success'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 font-mono text-[#ff3300] hover:text-[#e62e00]">
+                          <a href={`${EXPLORER_URL}/block/${tx.blockNumber}`} target="_blank" rel="noreferrer">
+                            {tx.blockNumber || '-'}
+                          </a>
+                        </td>
+                        <td className="px-6 py-4">
+                          {tx.timestamp ? new Date(tx.timestamp).toLocaleString(undefined, {
+                            year: 'numeric', month: 'short', day: 'numeric',
+                            hour: '2-digit', minute: '2-digit', second: '2-digit'
+                          }) : '-'}
+                        </td>
+                        <td className="px-6 py-4 font-mono">
+                          {tx.from ? (
+                            <a href={`${EXPLORER_URL}/address/${tx.from}`} target="_blank" rel="noreferrer" className="text-[#ff3300] hover:text-[#e62e00]">
+                              {tx.from.toLowerCase() === address?.toLowerCase() ? 'You' : `${tx.from.slice?.(0, 8) || tx.from}...${tx.from.slice?.(-6) || ''}`}
+                            </a>
+                          ) : '-'}
+                        </td>
+                        <td className="px-6 py-4 font-mono">
+                          {tx.to ? (
+                            <a href={`${EXPLORER_URL}/address/${tx.to}`} target="_blank" rel="noreferrer" className="text-[#ff3300] hover:text-[#e62e00]">
+                              {tx.to.toLowerCase() === CONTRACT_ADDRESS.toLowerCase() ? 'GhostPay' : `${tx.to.slice?.(0, 8) || tx.to}...${tx.to.slice?.(-6) || ''}`}
+                            </a>
+                          ) : '-'}
+                        </td>
+                        <td className="px-6 py-4 font-bold text-gray-900">
+                          {tx.type === 'Send' ? '-' : '+'}{tx.amount ? Number(tx.amount).toFixed(4) : '???'} {tx.symbol || 'Tokens'}
+                        </td>
+                        <td className="px-6 py-4 text-xs text-gray-400">
+                          {tx.fee ? Number(tx.fee).toFixed(6) : '0'} ETH
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          );
+        })()}
       </div>
     </motion.div>
   );
