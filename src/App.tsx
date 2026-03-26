@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback, Component } from 'react';
+import React, { useState, useEffect, useCallback, useRef, Component } from 'react';
 import { ethers } from 'ethers';
-import { Ghost, Send, Download, RotateCcw, Search, Coins, Wallet, ExternalLink, Copy, CheckCircle2, AlertCircle, Clock, ArrowRight, ShieldCheck, Info, Loader2, Menu, X, History, BookOpen, Lock } from 'lucide-react';
+import { Ghost, Send, Download, RotateCcw, Search, Coins, Wallet, ExternalLink, Copy, CheckCircle2, AlertCircle, Clock, ArrowRight, ShieldCheck, Info, Loader2, Menu, X, History, BookOpen, Lock, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -112,6 +112,87 @@ async function safeFetchJson(res: Response, fallback: any = { status: "0", resul
   } catch (e) {
     return fallback;
   }
+}
+
+function getTokenLogoUrl(symbol: string): string {
+  const sym = symbol.toLowerCase();
+  if (sym.includes('eth')) return 'https://cryptologos.cc/logos/ethereum-eth-logo.svg?v=025';
+  if (sym.includes('usdc')) return 'https://cryptologos.cc/logos/usd-coin-usdc-logo.svg?v=025';
+  if (sym.includes('usdt')) return 'https://cryptologos.cc/logos/tether-usdt-logo.svg?v=025';
+  if (sym.includes('dai')) return 'https://cryptologos.cc/logos/multi-collateral-dai-dai-logo.svg?v=025';
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(symbol)}&background=ff3300&color=fff&rounded=true&bold=true&size=32`;
+}
+
+function TokenSelector({ tokens, value, onChange }: { tokens: any[], value: string, onChange: (v: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const selected = tokens.find((t: any) => t.address === value);
+
+  useEffect(() => {
+    const close = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, []);
+
+  return (
+    <div ref={ref} className="relative shrink-0">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-2 bg-white border border-gray-200 text-gray-900 text-sm rounded-xl focus:ring-2 focus:ring-[#ff3300] focus:border-[#ff3300] p-3 font-bold shadow-sm cursor-pointer min-w-[130px]"
+      >
+        {selected ? (
+          <>
+            <img
+              src={getTokenLogoUrl(selected.symbol)}
+              alt={selected.symbol}
+              className="w-5 h-5 rounded-full border border-gray-100 shrink-0"
+              onError={(e) => { e.currentTarget.src = getTokenLogoUrl('?'); }}
+            />
+            <span className="flex-1 text-left">{selected.symbol}</span>
+          </>
+        ) : (
+          <span className="text-gray-400 flex-1 text-left">Select Token</span>
+        )}
+        <ChevronDown className={cn("w-4 h-4 text-gray-400 transition-transform", open && "rotate-180")} />
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: -4, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -4, scale: 0.98 }}
+            transition={{ duration: 0.1 }}
+            className="absolute right-0 top-full mt-2 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 min-w-[160px] overflow-hidden"
+          >
+            {tokens.map((t: any) => (
+              <button
+                key={t.address}
+                type="button"
+                onClick={() => { onChange(t.address); setOpen(false); }}
+                className={cn(
+                  "w-full flex items-center gap-3 px-4 py-3 text-sm font-bold hover:bg-gray-50 transition-colors text-left",
+                  t.address === value ? "bg-orange-50 text-[#ff3300]" : "text-gray-900"
+                )}
+              >
+                <img
+                  src={getTokenLogoUrl(t.symbol)}
+                  alt={t.symbol}
+                  className="w-6 h-6 rounded-full border border-gray-100 shrink-0"
+                  onError={(e) => { e.currentTarget.src = getTokenLogoUrl('?'); }}
+                />
+                <span>{t.symbol}</span>
+                {t.address === value && <CheckCircle2 className="w-4 h-4 ml-auto shrink-0" />}
+              </button>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
 }
 
 const CONTRACT_ADDRESS = "0x7906715ad6B8De952AbC35D00C6149E4AcEcA604";
@@ -448,6 +529,7 @@ function SendTab({ tokens, balances, signer, address, provider, showToast }: any
   const [txHash, setTxHash] = useState('');
   const [estimatedGasFee, setEstimatedGasFee] = useState<string | null>(null);
   const [estimatingGas, setEstimatingGas] = useState(false);
+  const [recipientError, setRecipientError] = useState<string | null>(null);
 
   const selectedToken = tokens.find((t: any) => t.address === token);
   const isETH = token === ETH_ADDR;
@@ -475,9 +557,12 @@ function SendTab({ tokens, balances, signer, address, provider, showToast }: any
         }
 
         const feeData = await provider.getFeeData();
-        const gasPrice = feeData.gasPrice || feeData.maxFeePerGas || 0n;
-        const totalFee = BigInt(estimatedGas) * BigInt(gasPrice);
-        setEstimatedGasFee(ethers.formatEther(totalFee));
+        // EIP-1559: prefer maxFeePerGas (base + priority) for accurate worst-case estimate
+        const effectiveGasPrice = feeData.maxFeePerGas ?? feeData.gasPrice ?? 0n;
+        const totalFee = BigInt(estimatedGas) * effectiveGasPrice;
+        const isEIP1559 = feeData.maxFeePerGas != null;
+        const formatted = ethers.formatEther(totalFee);
+        setEstimatedGasFee(isEIP1559 ? `${formatted}|eip1559` : formatted);
       } catch (e) {
         console.error("Gas estimation failed", e);
         setEstimatedGasFee('Unknown');
@@ -508,7 +593,11 @@ function SendTab({ tokens, balances, signer, address, provider, showToast }: any
     if (!token) return showToast("Select a token", "error");
     if (!amount || Number(amount) <= 0) return showToast("Enter a valid amount", "error");
     if (Number(amount) > Number(currentBalance)) return showToast("Insufficient balance", "error");
-    if (!recipient || !ethers.isAddress(recipient)) return showToast("Enter a valid recipient address", "error");
+    if (!recipient || !ethers.isAddress(recipient)) {
+      setRecipientError("Enter a valid Ethereum address (0x...)");
+      return showToast("Enter a valid recipient address", "error");
+    }
+    setRecipientError(null);
 
     try {
       const sec = ethers.hexlify(ethers.randomBytes(32));
@@ -650,19 +739,7 @@ function SendTab({ tokens, balances, signer, address, provider, showToast }: any
                   placeholder="0"
                   className="bg-transparent text-4xl font-medium outline-none w-full text-gray-900 placeholder-gray-300"
                 />
-                <div className="shrink-0">
-                  <select
-                    value={token}
-                    onChange={e => setToken(e.target.value)}
-                    className="bg-white border border-gray-200 text-gray-900 text-sm rounded-xl focus:ring-[#ff3300] focus:border-[#ff3300] block p-3 font-bold shadow-sm cursor-pointer appearance-none pr-8 relative"
-                    style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 0.5rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.5em 1.5em' }}
-                  >
-                    <option value="" disabled>Select Token</option>
-                    {tokens.map((t: any) => (
-                      <option key={t.address} value={t.address}>{t.symbol}</option>
-                    ))}
-                  </select>
-                </div>
+                <TokenSelector tokens={tokens} value={token} onChange={setToken} />
               </div>
               <div className="flex justify-between text-sm text-gray-500 mt-3 font-medium">
                 <span className={token ? "opacity-100" : "opacity-0"}>$ 0.00</span>
@@ -675,18 +752,40 @@ function SendTab({ tokens, balances, signer, address, provider, showToast }: any
             </div>
 
             {/* Recipient Block */}
-            <div className="bg-[#f9f9f9] rounded-2xl p-4 border border-gray-200 mb-4 transition-colors focus-within:border-orange-300 focus-within:bg-white">
+            <div className={cn(
+              "rounded-2xl p-4 border mb-1 transition-colors focus-within:bg-white",
+              recipientError
+                ? "bg-red-50 border-red-300 focus-within:border-red-400"
+                : "bg-[#f9f9f9] border-gray-200 focus-within:border-orange-300"
+            )}>
               <div className="flex justify-between text-sm text-gray-500 mb-2 font-medium">
                 <span>Recipient Address</span>
+                {recipient && ethers.isAddress(recipient) && (
+                  <span className="text-emerald-600 text-xs font-bold flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Valid</span>
+                )}
               </div>
               <input
                 type="text"
                 value={recipient}
-                onChange={e => setRecipient(e.target.value)}
+                onChange={e => {
+                  const val = e.target.value;
+                  setRecipient(val);
+                  if (val && !ethers.isAddress(val)) {
+                    setRecipientError('Not a valid Ethereum address');
+                  } else {
+                    setRecipientError(null);
+                  }
+                }}
                 placeholder="0x..."
                 className="bg-transparent text-lg font-mono outline-none w-full text-gray-900 placeholder-gray-300"
               />
             </div>
+            {recipientError && (
+              <div className="flex items-center gap-1.5 text-red-600 text-xs font-medium px-1 mb-3">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                {recipientError}
+              </div>
+            )}
 
             {/* Delay Block */}
             <div className="bg-[#f9f9f9] rounded-2xl p-4 border border-gray-200 mb-6 transition-colors focus-within:border-orange-300 focus-within:bg-white">
@@ -793,9 +892,17 @@ function SendTab({ tokens, balances, signer, address, provider, showToast }: any
                       <span className="text-amber-600 text-xs font-sans">Requires Approval</span>
                     ) : estimatedGasFee === 'Unknown' ? (
                       <span className="text-gray-400 font-sans">Unknown</span>
-                    ) : (
-                      `~${Number(estimatedGasFee).toFixed(6)} ETH`
-                    )
+                    ) : (() => {
+                      const [fee, tag] = (estimatedGasFee || '').split('|');
+                      return (
+                        <span className="flex items-center gap-1.5">
+                          ~{Number(fee).toFixed(6)} ETH
+                          {tag === 'eip1559' && (
+                            <span className="text-[9px] font-bold uppercase tracking-wider bg-blue-50 text-blue-600 border border-blue-200 px-1.5 py-0.5 rounded">EIP-1559</span>
+                          )}
+                        </span>
+                      );
+                    })()
                   ) : (
                     '-'
                   )}
@@ -911,9 +1018,12 @@ function ReceiveTab({ tokens, signer, address, showToast }: any) {
         const estimatedGas = await contract.d7a2c4f8.estimateGas(cleanSecret, nullifier);
 
         const feeData = await signer.provider.getFeeData();
-        const gasPrice = feeData.gasPrice || feeData.maxFeePerGas || 0n;
-        const totalFee = BigInt(estimatedGas) * BigInt(gasPrice);
-        setEstimatedGasFee(ethers.formatEther(totalFee));
+        // EIP-1559: prefer maxFeePerGas for accurate worst-case estimate
+        const effectiveGasPrice = feeData.maxFeePerGas ?? feeData.gasPrice ?? 0n;
+        const totalFee = BigInt(estimatedGas) * effectiveGasPrice;
+        const isEIP1559 = feeData.maxFeePerGas != null;
+        const formatted = ethers.formatEther(totalFee);
+        setEstimatedGasFee(isEIP1559 ? `${formatted}|eip1559` : formatted);
       } catch (e) {
         console.error("Gas estimation failed", e);
         setEstimatedGasFee('Unknown');
@@ -1083,9 +1193,17 @@ function ReceiveTab({ tokens, signer, address, showToast }: any) {
                       ) : estimatedGasFee ? (
                         estimatedGasFee === 'Unknown' ? (
                           <span className="text-gray-400 font-sans">Unknown</span>
-                        ) : (
-                          `~${Number(estimatedGasFee).toFixed(6)} ETH`
-                        )
+                        ) : (() => {
+                          const [fee, tag] = (estimatedGasFee || '').split('|');
+                          return (
+                            <span className="flex items-center gap-1.5">
+                              ~{Number(fee).toFixed(6)} ETH
+                              {tag === 'eip1559' && (
+                                <span className="text-[9px] font-bold uppercase tracking-wider bg-blue-50 text-blue-600 border border-blue-200 px-1.5 py-0.5 rounded">EIP-1559</span>
+                              )}
+                            </span>
+                          );
+                        })()
                       ) : (
                         '-'
                       )}
@@ -1714,16 +1832,10 @@ function TokensTab({ tokens, balances, address }: any) {
                 <div key={t.address} className="p-5 flex items-center justify-between hover:bg-white transition-colors gap-4">
                   <div className="flex items-center gap-4 min-w-0">
                     <img
-                      src={
-                        t.symbol.toLowerCase().includes('eth') ? 'https://cryptologos.cc/logos/ethereum-eth-logo.svg?v=025' :
-                          t.symbol.toLowerCase().includes('usdc') ? 'https://cryptologos.cc/logos/usd-coin-usdc-logo.svg?v=025' :
-                            t.symbol.toLowerCase().includes('usdt') ? 'https://cryptologos.cc/logos/tether-usdt-logo.svg?v=025' :
-                              t.symbol.toLowerCase().includes('dai') ? 'https://cryptologos.cc/logos/multi-collateral-dai-dai-logo.svg?v=025' :
-                                `https://ui-avatars.com/api/?name=${t.symbol}&background=ff3300&color=fff&rounded=true&bold=true`
-                      }
+                      src={getTokenLogoUrl(t.symbol)}
                       alt={t.symbol}
                       className="w-10 h-10 rounded-full shadow-sm border border-gray-100 shrink-0"
-                      onError={(e) => { e.currentTarget.src = `https://ui-avatars.com/api/?name=${t.symbol}&background=ff3300&color=fff&rounded=true&bold=true` }}
+                      onError={(e) => { e.currentTarget.src = getTokenLogoUrl('?'); }}
                     />
                     <div className="min-w-0">
                       <div className="font-bold text-gray-900 truncate">{t.symbol}</div>
