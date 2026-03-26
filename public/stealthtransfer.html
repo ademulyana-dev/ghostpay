@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GhostPay — Documentation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --orange: #ff3300;
+  --orange-h: #e62e00;
+  --orange-bg: #fff5f2;
+  --white: #ffffff;
+  --bg: #f9f9f9;
+  --bg2: #f3f4f6;
+  --border: #f3f4f6;
+  --border2: #e5e7eb;
+  --text: #111827;
+  --text2: #6b7280;
+  --text3: #9ca3af;
+  --success: #059669;
+  --success-bg: #ecfdf5;
+  --danger: #dc2626;
+  --danger-bg: #fef2f2;
+  --warn: #d97706;
+  --warn-bg: #fffbeb;
+  --font: 'Inter', sans-serif;
+  --mono: 'IBM Plex Mono', monospace;
+  --r: 16px;
+  --r-lg: 24px;
+  --shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 15px; scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--text); font-family: var(--font); margin: 0; padding: 0; }
+
+/* LAYOUT */
+.wrap { display: flex; min-height: 100vh; }
+
+/* SIDEBAR */
+.sidebar {
+  width: 260px;
+  background: var(--white);
+  border-right: 1px solid var(--border);
+  padding: 32px 0;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+.sb-lbl { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--text3); padding: 8px 24px 8px; }
+.sb-a {
+  display: block;
+  padding: 10px 24px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text2);
+  text-decoration: none;
+  transition: all .15s;
+  border-right: 3px solid transparent;
+}
+.sb-a:hover { background: var(--bg); color: var(--text); }
+.sb-a.active { background: var(--orange-bg); color: var(--orange); font-weight: 700; border-right-color: var(--orange); }
+.sb-div { height: 1px; background: var(--border); margin: 12px 0; }
+
+/* MAIN CONTENT */
+.content {
+  flex: 1;
+  padding: 48px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: var(--bg);
+}
+.content-inner { width: 100%; max-width: 720px; }
+
+/* HERO */
+.hero { margin-bottom: 48px; padding-bottom: 40px; border-bottom: 1px solid var(--border); }
+.hero-eyebrow {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--orange-bg); color: var(--orange);
+  font-size: 12px; font-weight: 700; padding: 6px 14px;
+  border-radius: 20px; border: 1px solid rgba(255,51,0,.2);
+  margin-bottom: 16px; letter-spacing: .02em;
+}
+.hero-title { font-size: 46px; font-weight: 800; color: var(--text); letter-spacing: -.04em; line-height: 1.1; margin-bottom: 16px; }
+.hero-title span { color: var(--orange); }
+.hero-desc { font-size: 16px; color: var(--text2); line-height: 1.65; max-width: 580px; margin-bottom: 24px; }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.chip { font-size: 13px; font-weight: 600; padding: 6px 14px; border-radius: 20px; border: 1px solid var(--border2); color: var(--text2); background: var(--white); box-shadow: var(--shadow); }
+
+/* SECTION */
+.section { margin-bottom: 56px; scroll-margin-top: 32px; }
+.sec-label {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--white); color: var(--text3);
+  font-size: 11px; font-weight: 700; padding: 4px 12px;
+  border-radius: 20px; border: 1px solid var(--border);
+  margin-bottom: 12px; letter-spacing: .05em; text-transform: uppercase;
+}
+.sec-title { font-size: 28px; font-weight: 800; color: var(--text); letter-spacing: -.03em; margin-bottom: 8px; }
+.sec-desc { font-size: 15px; color: var(--text2); margin-bottom: 24px; line-height: 1.6; }
+
+/* STEPS */
+.steps { display: flex; flex-direction: column; gap: 12px; }
+.step-card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 24px;
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  box-shadow: var(--shadow);
+  transition: border-color .15s;
+}
+.step-card:hover { border-color: rgba(255,51,0,.3); }
+.step-num {
+  width: 40px; height: 40px;
+  background: var(--orange-bg);
+  color: var(--orange);
+  font-size: 18px; font-weight: 800;
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  border: 1px solid rgba(255,51,0,.2);
+}
+.step-title { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+.step-desc { font-size: 14px; color: var(--text2); line-height: 1.6; }
+.step-note {
+  margin-top: 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--text2);
+  font-family: var(--mono);
+  line-height: 1.5;
+}
+
+/* TABLE */
+.tbl-card { background: var(--white); border: 1px solid var(--border); border-radius: var(--r-lg); overflow: hidden; box-shadow: var(--shadow); margin-bottom: 16px; }
+table { width: 100%; border-collapse: collapse; }
+th { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--text3); padding: 14px 20px; text-align: left; background: var(--white); border-bottom: 1px solid var(--border); }
+td { padding: 16px 20px; font-size: 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: var(--bg); }
+td.mono { font-family: var(--mono); font-size: 12px; color: var(--orange); }
+
+/* INFO CARD */
+.info-card { background: var(--white); border: 1px solid var(--border); border-radius: var(--r-lg); overflow: hidden; box-shadow: var(--shadow); margin-bottom: 16px; }
+.info-row { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+.info-row:last-child { border-bottom: none; }
+.info-k { font-size: 14px; font-weight: 600; color: var(--text2); }
+.info-v { font-size: 14px; color: var(--text); font-family: var(--mono); text-align: right; }
+
+/* ALERT BOXES */
+.alert { border-radius: var(--r); padding: 16px 20px; font-size: 14px; margin-bottom: 16px; line-height: 1.6; font-weight: 500; }
+.a-warn { background: var(--warn-bg); color: var(--warn); border: 1px solid rgba(217,119,6,.2); }
+.a-ok   { background: var(--success-bg); color: var(--success); border: 1px solid rgba(5,150,105,.2); }
+.a-info { background: var(--orange-bg); color: var(--orange); border: 1px solid rgba(255,51,0,.2); }
+
+/* PRIVACY GRID */
+.pg { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.pc { background: var(--white); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 24px; box-shadow: var(--shadow); }
+.pc-title { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+.pc-desc { font-size: 13px; color: var(--text2); line-height: 1.6; }
+
+/* FAQ */
+.faq { display: flex; flex-direction: column; gap: 12px; }
+.faq-item { background: var(--white); border: 1px solid var(--border); border-radius: var(--r-lg); overflow: hidden; box-shadow: var(--shadow); }
+.faq-q { padding: 20px 24px; font-size: 15px; font-weight: 600; color: var(--text); cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: background .15s; user-select: none; }
+.faq-q:hover { background: var(--bg); }
+.faq-ic { font-size: 20px; color: var(--text3); font-weight: 300; transition: transform .2s; flex-shrink: 0; }
+.faq-ic.open { transform: rotate(45deg); color: var(--orange); }
+.faq-a { padding: 0 24px 20px; font-size: 14px; color: var(--text2); line-height: 1.7; display: none; }
+.faq-a.open { display: block; }
+
+code { font-family: var(--mono); font-size: 13px; background: var(--bg); padding: 2px 6px; border-radius: 6px; color: var(--orange); border: 1px solid var(--border); }
+
+@media (max-width: 768px) {
+  .sidebar { display: none; }
+  .content { padding: 32px 20px; }
+  .pg { grid-template-columns: 1fr; }
+  .hero-title { font-size: 36px; }
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sb-lbl">Overview</div>
+    <a href="#intro" class="sb-a active">Introduction</a>
+    <a href="#how-it-works" class="sb-a">How It Works</a>
+    <a href="#privacy" class="sb-a">Privacy Model</a>
+    <div class="sb-div"></div>
+    <div class="sb-lbl">User Guide</div>
+    <a href="#send" class="sb-a">Sending a Transfer</a>
+    <a href="#receive" class="sb-a">Claiming a Transfer</a>
+    <a href="#cancel" class="sb-a">Cancel & Refund</a>
+    <a href="#status" class="sb-a">Check Status</a>
+    <div class="sb-div"></div>
+    <div class="sb-lbl">Reference</div>
+    <a href="#network" class="sb-a">Network & Tokens</a>
+    <a href="#faq" class="sb-a">FAQ</a>
+  </aside>
+
+  <!-- CONTENT -->
+  <main class="content">
+    <div class="content-inner">
+
+      <!-- HERO -->
+      <div class="hero" id="intro">
+        <div class="hero-eyebrow">👻 User Documentation</div>
+        <div class="hero-title">Ghost<span>Pay</span><br>User Guide</div>
+        <div class="hero-desc">A privacy-first token transfer protocol. Send tokens to anyone without exposing the recipient address on-chain. Simple, non-custodial, and chain-agnostic.</div>
+        <div class="chips">
+          <span class="chip">Non-Custodial</span>
+          <span class="chip">Commitment Scheme</span>
+          <span class="chip">Auto-Detect Deposits</span>
+          <span class="chip">Multi-Chain Ready</span>
+          <span class="chip">No Registration</span>
+        </div>
+      </div>
+
+      <!-- HOW IT WORKS -->
+      <div class="section" id="how-it-works">
+        <div class="sec-label">📖 Overview</div>
+        <div class="sec-title">How It Works</div>
+        <div class="sec-desc">GhostPay uses a cryptographic commitment scheme to completely decouple sender and recipient on-chain.</div>
+        <div class="steps">
+          <div class="step-card">
+            <div class="step-num">1</div>
+            <div>
+              <div class="step-title">Sender generates a secret code</div>
+              <div class="step-desc">A random 32-byte secret is generated locally in your browser. A commitment hash is derived from the secret combined with the recipient address, token, and amount. Only the commitment hash is ever stored on-chain — never the secret itself.</div>
+            </div>
+          </div>
+          <div class="step-card">
+            <div class="step-num">2</div>
+            <div>
+              <div class="step-title">Sender deposits tokens into the contract</div>
+              <div class="step-desc">Tokens are locked in the smart contract against the commitment hash. The deposit transaction records only the commitment hash — no recipient address, no readable amount correlation.</div>
+            </div>
+          </div>
+          <div class="step-card">
+            <div class="step-num">3</div>
+            <div>
+              <div class="step-title">Secret code is shared off-chain</div>
+              <div class="step-desc">The sender shares the secret code with the recipient through any private off-chain channel — Telegram DM, Signal, email, or any other secure method. This is the only piece of information the recipient needs.</div>
+              <div class="step-note">⚠️ Never share the secret code publicly or on-chain. Keep it private.</div>
+            </div>
+          </div>
+          <div class="step-card">
+            <div class="step-num">4</div>
+            <div>
+              <div class="step-title">Recipient claims the transfer</div>
+              <div class="step-desc">The recipient connects their wallet and pastes the secret code. GhostPay automatically scans on-chain events to find the matching deposit. Once confirmed, tokens land directly in their wallet.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PRIVACY -->
+      <div class="section" id="privacy">
+        <div class="sec-label">🔒 Security</div>
+        <div class="sec-title">Privacy Model</div>
+        <div class="sec-desc">Understanding what is and is not visible on-chain.</div>
+        <div class="pg">
+          <div class="pc">
+            <div class="pc-title"><span style="color:#059669;font-size:16px">●</span> Not visible on-chain</div>
+            <div class="pc-desc">The secret code, recipient address, and readable amount do not appear in the withdrawal calldata or event logs. No direct on-chain link is created between sender and recipient.</div>
+          </div>
+          <div class="pc">
+            <div class="pc-title"><span style="color:#ff3300;font-size:16px">●</span> Visible on-chain</div>
+            <div class="pc-desc">The sender address (in the deposit transaction), the commitment hash, and the deposit deadline are publicly visible. The token type and locked amount are stored in contract state.</div>
+          </div>
+          <div class="pc">
+            <div class="pc-title"><span style="color:#dc2626;font-size:16px">●</span> Important limitation</div>
+            <div class="pc-desc">An analyst who has the secret code can re-derive the commitment hash and correlate sender to recipient. Keeping the secret private is essential to maintaining privacy.</div>
+          </div>
+          <div class="pc">
+            <div class="pc-title"><span style="color:#059669;font-size:16px">●</span> Double-spend protection</div>
+            <div class="pc-desc">Each secret code can only be used once. A nullifier hash is permanently stored on-chain after a successful claim, preventing any replay or double-claim attacks.</div>
+          </div>
+        </div>
+        <div class="alert a-info">💡 For maximum privacy, use a fresh wallet address as the recipient that has no prior on-chain history linking it to your identity.</div>
+      </div>
+
+      <!-- SEND -->
+      <div class="section" id="send">
+        <div class="sec-label">📤 User Guide</div>
+        <div class="sec-title">Sending a Transfer</div>
+        <div class="sec-desc">Step-by-step guide to sending a private token transfer.</div>
+        <div class="steps">
+          <div class="step-card">
+            <div class="step-num">1</div>
+            <div>
+              <div class="step-title">Connect your wallet</div>
+              <div class="step-desc">Click <strong>Connect Wallet</strong> in the top-right corner. GhostPay supports MetaMask and any compatible Web3 wallet. The app will prompt you to switch to the correct network if needed.</div>
+            </div>
+          </div>
+          <div class="step-card">
+            <div class="step-num">2</div>
+            <div>
+              <div class="step-title">Fill in the transfer details</div>
+              <div class="step-desc">Open the <strong>Send</strong> tab. Select the token you want to send, enter the amount, and paste the recipient's wallet address.</div>
+            </div>
+          </div>
+          <div class="step-card">
+            <div class="step-num">3</div>
+            <div>
+              <div class="step-title">Set a refund delay</div>
+              <div class="step-desc">Choose how long before you can cancel and reclaim the funds if the recipient never claims. This protects you in case the recipient loses the secret code or never acts on it.</div>
+            </div>
+          </div>
+          <div class="step-card">
+            <div class="step-num">4</div>
+            <div>
+              <div class="step-title">Generate secret code and deposit</div>
+              <div class="step-desc">Click <strong>Generate Secret Code</strong>. For ERC-20 tokens, you must approve the contract first — then confirm the deposit transaction in your wallet. Save the Secret Code, Commitment Hash, and Nullifier shown on screen.</div>
+              <div class="step-note">Save all three values before closing this screen. They cannot be recovered if lost.</div>
+            </div>
+          </div>
+          <div class="step-card">
+            <div class="step-num">5</div>
+            <div>
+              <div class="step-title">Share the secret code privately</div>
+              <div class="step-desc">Send the <strong>Secret Code</strong> to the recipient through a private channel. They only need this code and their matching wallet to claim the funds.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RECEIVE -->
+      <div class="section" id="receive">
+        <div class="sec-label">📥 User Guide</div>
+        <div class="sec-title">Claiming a Transfer</div>
+        <div class="sec-desc">How to claim tokens that have been sent to you.</div>
+        <div class="steps">
+          <div class="step-card">
+            <div class="step-num">1</div>
+            <div>
+              <div class="step-title">Connect the recipient wallet</div>
+              <div class="step-desc">Connect the wallet address that was used as the recipient by the sender. The token claim will go directly to this connected wallet — make sure it is the correct one before proceeding.</div>
+            </div>
+          </div>
+          <div class="step-card">
+            <div class="step-num">2</div>
+            <div>
+              <div class="step-title">Paste the secret code</div>
+              <div class="step-desc">Open the <strong>Receive</strong> tab and paste the secret code shared by the sender. GhostPay automatically scans on-chain events across all supported tokens to find the matching deposit.</div>
+            </div>
+          </div>
+          <div class="step-card">
+            <div class="step-num">3</div>
+            <div>
+              <div class="step-title">Review and confirm</div>
+              <div class="step-desc">If a matching deposit is found, the token and amount are displayed automatically. Verify the details and click <strong>Claim Tokens</strong> to confirm the transaction in your wallet.</div>
+            </div>
+          </div>
+          <div class="step-card">
+            <div class="step-num">4</div>
+            <div>
+              <div class="step-title">Tokens arrive in your wallet</div>
+              <div class="step-desc">After the transaction confirms, tokens are transferred directly to your connected wallet. A link to the transaction on the block explorer is shown for reference.</div>
+              <div class="step-note">ℹ️ A small amount of the native gas token is required to pay the claim transaction fee. The amount depends on current network conditions.</div>
+            </div>
+          </div>
+        </div>
+        <div class="alert a-warn" style="margin-top:14px">⚠️ If no deposit is found, verify: you are using the correct recipient wallet, the secret code is complete and unmodified, and the deposit has not already been claimed or cancelled.</div>
+      </div>
+
+      <!-- CANCEL -->
+      <div class="section" id="cancel">
+        <div class="sec-label">↩️ User Guide</div>
+        <div class="sec-title">Cancel & Get a Refund</div>
+        <div class="sec-desc">Reclaim your deposit if the recipient has not claimed within the refund delay period.</div>
+        <div class="alert a-info" style="margin-bottom:18px">ℹ️ Cancellation is only available after the refund delay you set at deposit has fully elapsed. Only the original sender wallet can cancel.</div>
+        <div class="steps">
+          <div class="step-card">
+            <div class="step-num">1</div>
+            <div>
+              <div class="step-title">Locate your Commitment Hash</div>
+              <div class="step-desc">The Commitment Hash was shown when you generated the secret code. It is also visible in your deposit transaction on the block explorer. Keep this saved along with your secret code.</div>
+            </div>
+          </div>
+          <div class="step-card">
+            <div class="step-num">2</div>
+            <div>
+              <div class="step-title">Open the Cancel tab</div>
+              <div class="step-desc">Navigate to <strong>Cancel & Refund</strong> and paste the Commitment Hash. The app will show the current deposit status and whether the refund deadline has passed.</div>
+            </div>
+          </div>
+          <div class="step-card">
+            <div class="step-num">3</div>
+            <div>
+              <div class="step-title">Submit the cancellation</div>
+              <div class="step-desc">Once the refund deadline has passed and the deposit is still unclaimed, click <strong>Cancel & Get Refund</strong>. Tokens are returned to your original sender wallet.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- STATUS -->
+      <div class="section" id="status">
+        <div class="sec-label">🔍 User Guide</div>
+        <div class="sec-title">Check Deposit Status</div>
+        <div class="sec-desc">Look up the current state of any deposit using its Commitment Hash.</div>
+        <div class="tbl-card">
+          <table>
+            <thead><tr><th>Status</th><th>Meaning</th></tr></thead>
+            <tbody>
+              <tr><td><span style="background:var(--orange-bg);color:var(--orange);font-weight:700;font-size:12px;padding:4px 12px;border-radius:20px">Active</span></td><td style="color:var(--text2)">Deposit exists and is waiting to be claimed by the recipient.</td></tr>
+              <tr><td><span style="background:var(--success-bg);color:var(--success);font-weight:700;font-size:12px;padding:4px 12px;border-radius:20px">Claimed</span></td><td style="color:var(--text2)">The recipient has successfully claimed the tokens.</td></tr>
+              <tr><td><span style="background:var(--danger-bg);color:var(--danger);font-weight:700;font-size:12px;padding:4px 12px;border-radius:20px">Cancelled</span></td><td style="color:var(--text2)">The sender cancelled and reclaimed the deposit after the delay expired.</td></tr>
+              <tr><td><span style="background:var(--bg);color:var(--text3);font-weight:700;font-size:12px;padding:4px 12px;border-radius:20px;border:1px solid var(--border)">Not Found</span></td><td style="color:var(--text2)">No deposit exists for this Commitment Hash on the current network.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- NETWORK & TOKENS -->
+      <div class="section" id="network">
+        <div class="sec-label">🌐 Reference</div>
+        <div class="sec-title">Network & Supported Tokens</div>
+        <div class="sec-desc">GhostPay is currently live on Ethereum Sepolia for testing and is designed to expand to additional networks in the future.</div>
+
+        <div class="alert a-info" style="margin-bottom:20px">🚀 GhostPay is built to be chain-agnostic. Additional networks will be added over time. Stay tuned for updates.</div>
+
+        <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:12px">Current Network</div>
+        <div class="info-card" style="margin-bottom:24px">
+          <div class="info-row"><span class="info-k">Network</span><span class="info-v">Ethereum Sepolia (Testnet)</span></div>
+          <div class="info-row"><span class="info-k">Chain ID</span><span class="info-v">11155111</span></div>
+          <div class="info-row"><span class="info-k">Block Explorer</span><span class="info-v" style="color:var(--orange)">eth-sepolia.blockscout.com</span></div>
+        </div>
+
+        <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:12px">Supported Tokens</div>
+        <div class="tbl-card">
+          <table>
+            <thead><tr><th>Symbol</th><th>Contract Address</th><th>Decimals</th></tr></thead>
+            <tbody>
+              <tr><td style="font-weight:700;color:var(--orange)">ETH</td><td class="mono">Native (address 0x0)</td><td style="font-family:var(--mono);font-size:12px">18</td></tr>
+              <tr><td style="font-weight:700;color:var(--orange)">DAI</td><td class="mono">0xFF34B3d4Aee8ddCd6F9AFFFB6Fe49bD371b8a357</td><td style="font-family:var(--mono);font-size:12px">18</td></tr>
+              <tr><td style="font-weight:700;color:var(--orange)">EURS</td><td class="mono">0x6d906e526a4e2Ca02097BA9d0caA3c382F52278E</td><td style="font-family:var(--mono);font-size:12px">18</td></tr>
+              <tr><td style="font-weight:700;color:var(--orange)">USDC</td><td class="mono">0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4C8</td><td style="font-family:var(--mono);font-size:12px">6</td></tr>
+              <tr><td style="font-weight:700;color:var(--orange)">USDT</td><td class="mono">0xaA8E23Fb1079EA71e0a56F48a2aA51851D8433D0</td><td style="font-family:var(--mono);font-size:12px">6</td></tr>
+              <tr><td style="font-weight:700;color:var(--orange)">AAVE</td><td class="mono">0x88541670E55cC00bEEFD87eB59EDd1b7C511AC9a</td><td style="font-family:var(--mono);font-size:12px">18</td></tr>
+              <tr><td style="font-weight:700;color:var(--orange)">LINK</td><td class="mono">0xf8Fb3713D459D7C1018BD0A49D19b4C44290EBE5</td><td style="font-family:var(--mono);font-size:12px">18</td></tr>
+              <tr><td style="font-weight:700;color:var(--orange)">WBTC</td><td class="mono">0x29f2D40B0605204364af54EC677bD022dA425d03</td><td style="font-family:var(--mono);font-size:12px">8</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- FAQ -->
+      <div class="section" id="faq">
+        <div class="sec-label">❓ Support</div>
+        <div class="sec-title">Frequently Asked Questions</div>
+        <div class="sec-desc">Common questions about using GhostPay.</div>
+        <div class="faq">
+          <div class="faq-item">
+            <div class="faq-q" onclick="faq(this)"><span>What happens if I lose the secret code?</span><span class="faq-ic">+</span></div>
+            <div class="faq-a">The secret code is the only way to claim a deposit. If it is lost, the only recovery path is to wait for the refund delay to expire and cancel the deposit to reclaim your tokens. There is no other recovery mechanism — keep the secret code saved securely.</div>
+          </div>
+          <div class="faq-item">
+            <div class="faq-q" onclick="faq(this)"><span>Can someone else claim the transfer if they have the secret code?</span><span class="faq-ic">+</span></div>
+            <div class="faq-a">No. The commitment is derived from secret + recipient address + token + amount. The claim function uses <code>msg.sender</code> as the recipient — meaning only the wallet matching the original recipient address can successfully claim, even if another party has the secret code.</div>
+          </div>
+          <div class="faq-item">
+            <div class="faq-q" onclick="faq(this)"><span>Does the recipient need the native gas token to claim?</span><span class="faq-ic">+</span></div>
+            <div class="faq-a">Yes. A small amount of the network's native token is required to pay the gas fee for the claim transaction. The exact amount depends on current network congestion and gas prices at the time of claiming.</div>
+          </div>
+          <div class="faq-item">
+            <div class="faq-q" onclick="faq(this)"><span>What is the Commitment Hash?</span><span class="faq-ic">+</span></div>
+            <div class="faq-a">A cryptographic fingerprint derived from: secret code + recipient address + token address + amount. It is stored on-chain at deposit time and used to verify a claim — without ever revealing the underlying secret. Keep it saved; you will need it if you ever want to cancel the deposit.</div>
+          </div>
+          <div class="faq-item">
+            <div class="faq-q" onclick="faq(this)"><span>Can I send to my own wallet address?</span><span class="faq-ic">+</span></div>
+            <div class="faq-a">Yes. You can set your own address as the recipient. This is a common use case for transferring between your own wallets without creating a direct on-chain link between the two addresses.</div>
+          </div>
+          <div class="faq-item">
+            <div class="faq-q" onclick="faq(this)"><span>Why does the scan take a moment when I paste the secret?</span><span class="faq-ic">+</span></div>
+            <div class="faq-a">GhostPay scans on-chain deposit events for all supported tokens to find your matching deposit automatically. Scan time depends on the number of deposits on-chain and the RPC response speed. Make sure your wallet is connected before scanning.</div>
+          </div>
+          <div class="faq-item">
+            <div class="faq-q" onclick="faq(this)"><span>Can the contract owner access deposited funds?</span><span class="faq-ic">+</span></div>
+            <div class="faq-a">No. GhostPay is fully non-custodial. The contract owner can only manage the supported token list. Only the recipient (with the correct secret code and wallet) or the original depositor (after the refund delay expires) can ever move funds.</div>
+          </div>
+          <div class="faq-item">
+            <div class="faq-q" onclick="faq(this)"><span>Will GhostPay support more networks?</span><span class="faq-ic">+</span></div>
+            <div class="faq-a">Yes. GhostPay is built to be chain-agnostic and is designed to expand to additional EVM-compatible networks. The current deployment is for testing purposes. More networks and tokens will be added over time.</div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /content-inner -->
+  </main>
+</div>
+
+<script>
+function faq(el) {
+  const a = el.nextElementSibling;
+  const ic = el.querySelector('.faq-ic');
+  const open = a.classList.toggle('open');
+  ic.classList.toggle('open', open);
+}
+
+// Sidebar active highlight on scroll
+const sections = document.querySelectorAll('.section, .hero');
+const navLinks  = document.querySelectorAll('.sb-a');
+window.addEventListener('scroll', () => {
+  let current = '';
+  sections.forEach(s => { if (window.scrollY >= s.offsetTop - 80) current = s.id; });
+  navLinks.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + current));
+}, { passive: true });
+</script>
+</body>
+</html>
