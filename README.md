@@ -1,6 +1,4 @@
 <div align="center">
-  <img width="1200" height="475" alt="GhostPay Banner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-
   <h1>GhostPay</h1>
   <p><strong>Privacy-first stealth payment protocol on Ethereum</strong></p>
 
