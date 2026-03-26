@@ -237,6 +237,7 @@ function AppContent() {
   const [balances, setBalances] = useState<Record<string, string>>({});
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [toast, setToast] = useState<{ msg: React.ReactNode, type: 'success' | 'error' | 'info' } | null>(null);
+  const [isConnecting, setIsConnecting] = useState(false);
 
   const showToast = (msg: React.ReactNode, type: 'success' | 'error' | 'info' = 'info') => {
     setToast({ msg, type });
@@ -244,10 +245,12 @@ function AppContent() {
   };
 
   const connectWallet = async () => {
+    if (isConnecting || address) return;
     if (!window.ethereum) {
       showToast("MetaMask not found", "error");
       return;
     }
+    setIsConnecting(true);
     try {
       const p = new ethers.BrowserProvider(window.ethereum as any);
       const n = await p.getNetwork();
@@ -262,18 +265,23 @@ function AppContent() {
           return;
         }
       }
-      const s = await p.getSigner();
+      // Bug #11: Recreate provider after chain switch so it uses the correct network
+      const connectedProvider = new ethers.BrowserProvider(window.ethereum as any);
+      const s = await connectedProvider.getSigner();
       const a = await s.getAddress();
-      setProvider(p);
+      setProvider(connectedProvider);
       setSigner(s);
       setAddress(a);
       showToast("Wallet connected!", "success");
     } catch (e: any) {
       showToast(e.message || "Connection failed", "error");
+    } finally {
+      setIsConnecting(false);
     }
   };
 
   useEffect(() => {
+    let mounted = true;
     const loadTokens = async () => {
       try {
         const rpcProvider = new ethers.JsonRpcProvider(RPC_URL);
@@ -293,15 +301,17 @@ function AppContent() {
           }
           loadedTokens.push({ address: addrs[i], symbol: symbols[i], decimals });
         }
-        setTokens(loadedTokens);
+        if (mounted) setTokens(loadedTokens);
       } catch (e) {
         console.error("Failed to load tokens", e);
       }
     };
     loadTokens();
+    return () => { mounted = false; };
   }, []);
 
   useEffect(() => {
+    let mounted = true;
     const fetchBalances = async () => {
       if (!address || !provider || tokens.length === 0) return;
 
@@ -323,10 +333,11 @@ function AppContent() {
         }
       }
 
-      setBalances(newBalances);
+      if (mounted) setBalances(newBalances);
     };
 
     fetchBalances();
+    return () => { mounted = false; };
   }, [address, provider, tokens]);
 
   return (
@@ -382,7 +393,7 @@ function AppContent() {
                       key={j}
                       className="flex-1 aspect-square rounded-[1px]"
                       animate={{ backgroundColor: colors[val] }}
-                      transition={{ duration: 0.5 + Math.random() * 0.8, repeat: Infinity, repeatType: 'mirror', ease: 'easeInOut' }}
+                      transition={{ duration: 0.5 + ((i * 16 + j) * 7919 % 100) / 125, repeat: Infinity, repeatType: 'mirror', ease: 'easeInOut' }}
                     />
                   );
                 })}
@@ -435,10 +446,11 @@ function AppContent() {
             <span className="bg-orange-50 text-[#ff3300] text-[11px] font-bold px-3 py-1.5 rounded-full border border-orange-200 font-mono tracking-wider">SEPOLIA</span>
             <button
               onClick={connectWallet}
-              className="bg-[#ff3300] hover:bg-[#e62e00] text-white px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-colors shadow-sm"
+              disabled={isConnecting || !!address}
+              className="bg-[#ff3300] hover:bg-[#e62e00] disabled:opacity-70 disabled:cursor-default text-white px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-colors shadow-sm"
             >
-              <Wallet className="w-4 h-4" />
-              {address ? `${address.slice(0, 6)}...${address.slice(-4)}` : 'Connect Wallet'}
+              {isConnecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wallet className="w-4 h-4" />}
+              {address ? `${address.slice(0, 6)}...${address.slice(-4)}` : isConnecting ? 'Connecting...' : 'Connect Wallet'}
             </button>
           </div>
         </header>
@@ -447,10 +459,11 @@ function AppContent() {
         <div className="md:hidden p-4 flex justify-end">
           <button
             onClick={connectWallet}
-            className="bg-[#ff3300] hover:bg-[#e62e00] text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 text-sm shadow-sm"
+            disabled={isConnecting || !!address}
+            className="bg-[#ff3300] hover:bg-[#e62e00] disabled:opacity-70 disabled:cursor-default text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 text-sm shadow-sm"
           >
-            <Wallet className="w-4 h-4" />
-            {address ? `${address.slice(0, 6)}...${address.slice(-4)}` : 'Connect Wallet'}
+            {isConnecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wallet className="w-4 h-4" />}
+            {address ? `${address.slice(0, 6)}...${address.slice(-4)}` : isConnecting ? 'Connecting...' : 'Connect Wallet'}
           </button>
         </div>
 
@@ -536,9 +549,10 @@ function SendTab({ tokens, balances, signer, address, provider, showToast }: any
   const currentBalance = balances[token] || '0';
 
   useEffect(() => {
+    let cancelled = false;
     const estimateGas = async () => {
       if (step !== 2 || !signer || !provider || !amount || isNaN(Number(amount))) return;
-      setEstimatingGas(true);
+      if (!cancelled) setEstimatingGas(true);
       try {
         const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
         const amt = ethers.parseUnits(amount, selectedToken?.decimals || 18);
@@ -562,18 +576,20 @@ function SendTab({ tokens, balances, signer, address, provider, showToast }: any
         const totalFee = BigInt(estimatedGas) * effectiveGasPrice;
         const isEIP1559 = feeData.maxFeePerGas != null;
         const formatted = ethers.formatEther(totalFee);
-        setEstimatedGasFee(isEIP1559 ? `${formatted}|eip1559` : formatted);
+        if (!cancelled) setEstimatedGasFee(isEIP1559 ? `${formatted}|eip1559` : formatted);
       } catch (e) {
         console.error("Gas estimation failed", e);
-        setEstimatedGasFee('Unknown');
+        if (!cancelled) setEstimatedGasFee('Unknown');
       } finally {
-        setEstimatingGas(false);
+        if (!cancelled) setEstimatingGas(false);
       }
     };
     estimateGas();
+    return () => { cancelled = true; };
   }, [step, isApproved, signer, provider, isETH, amount, selectedToken, delay, commitment, token]);
 
   useEffect(() => {
+    setIsApproved(false); // Reset immediately on dependency change to avoid stale approval
     const checkAllowance = async () => {
       if (!signer || !token || isETH || !amount || isNaN(Number(amount))) return;
       try {
@@ -980,7 +996,11 @@ function SendTab({ tokens, balances, signer, address, provider, showToast }: any
             </div>
 
             <button
-              onClick={() => { setStep(1); setAmount(''); setSecret(''); setCommitment(''); }}
+              onClick={() => {
+                setStep(1); setAmount(''); setSecret(''); setCommitment('');
+                setNullifier(''); setRecipient(''); setRecipientError(null);
+                setIsApproved(false); setTxHash(''); setEstimatedGasFee(null);
+              }}
               className="w-full bg-gray-900 text-white hover:bg-black font-bold rounded-xl text-lg px-8 py-4 text-center transition-all shadow-sm"
             >
               Send Another Transfer
@@ -1006,33 +1026,36 @@ function ReceiveTab({ tokens, signer, address, showToast }: any) {
   const [estimatingGas, setEstimatingGas] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
     const estimateGas = async () => {
       if (!deposit || !signer || deposit.claimed || deposit.cancelled || !deposit.walletMatch) return;
-      setEstimatingGas(true);
+      if (!cancelled) setEstimatingGas(true);
       try {
         const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
-        const cleanSecret = secret.trim();
         const cleanCommitment = commitmentInput.trim();
         const nullifier = ethers.solidityPackedKeccak256(["bytes32", "string"], [cleanCommitment, "nullifier"]);
-
-        const estimatedGas = await contract.d7a2c4f8.estimateGas(cleanSecret, nullifier);
+        // Bug #2: pass all 5 required args; use dummy signature for estimation only
+        const dummySig = '0x' + '00'.repeat(65);
+        const estimatedGas = await contract.d7a2c4f8.estimateGas(
+          deposit.commitment, nullifier, deposit.token, deposit.amount, dummySig
+        );
 
         const feeData = await signer.provider.getFeeData();
-        // EIP-1559: prefer maxFeePerGas for accurate worst-case estimate
         const effectiveGasPrice = feeData.maxFeePerGas ?? feeData.gasPrice ?? 0n;
         const totalFee = BigInt(estimatedGas) * effectiveGasPrice;
         const isEIP1559 = feeData.maxFeePerGas != null;
         const formatted = ethers.formatEther(totalFee);
-        setEstimatedGasFee(isEIP1559 ? `${formatted}|eip1559` : formatted);
+        if (!cancelled) setEstimatedGasFee(isEIP1559 ? `${formatted}|eip1559` : formatted);
       } catch (e) {
         console.error("Gas estimation failed", e);
-        setEstimatedGasFee('Unknown');
+        if (!cancelled) setEstimatedGasFee('Unknown');
       } finally {
-        setEstimatingGas(false);
+        if (!cancelled) setEstimatingGas(false);
       }
     };
     estimateGas();
-  }, [deposit, signer, secret, commitmentInput]);
+    return () => { cancelled = true; };
+  }, [deposit, signer, commitmentInput]);
 
   const handleScan = async () => {
     const cleanSecret = secret.trim();
@@ -1236,7 +1259,7 @@ function ReceiveTab({ tokens, signer, address, showToast }: any) {
             </a>
 
             <button
-              onClick={() => { setTxHash(''); setSecret(''); setCommitmentInput(''); setDeposit(null); }}
+              onClick={() => { setTxHash(''); setSecret(''); setCommitmentInput(''); setDeposit(null); setEstimatedGasFee(null); setEstimatingGas(false); }}
               className="w-full bg-[#ff3300] text-white hover:bg-[#e62e00] font-bold rounded-2xl text-lg px-8 py-4 text-center transition-all shadow-sm"
             >
               Claim Another Transfer
@@ -1261,11 +1284,13 @@ function CancelTab({ tokens, signer, address, showToast }: any) {
   const [gasEstimates, setGasEstimates] = useState<Record<string, string>>({});
 
   useEffect(() => {
+    let cancelled = false;
     const estimateGas = async () => {
       if (!signer) return;
       const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
       const feeData = await signer.provider.getFeeData();
-      const gasPrice = feeData.gasPrice || feeData.maxFeePerGas || 0n;
+      // Bug #4: prefer maxFeePerGas (EIP-1559) for accurate worst-case estimate
+      const effectiveGasPrice = feeData.maxFeePerGas ?? feeData.gasPrice ?? 0n;
 
       const estimates: Record<string, string> = {};
 
@@ -1273,7 +1298,7 @@ function CancelTab({ tokens, signer, address, showToast }: any) {
         if (Date.now() >= dep.deadline) {
           try {
             const estimatedGas = await contract.f4e9b1a6.estimateGas(dep.commitment);
-            const totalFee = BigInt(estimatedGas) * BigInt(gasPrice);
+            const totalFee = BigInt(estimatedGas) * effectiveGasPrice;
             estimates[dep.commitment] = ethers.formatEther(totalFee);
           } catch (e) {
             estimates[dep.commitment] = 'Unknown';
@@ -1281,19 +1306,21 @@ function CancelTab({ tokens, signer, address, showToast }: any) {
         }
       }
 
-      if (manualDepositInfo && Date.now() >= manualDepositInfo.deadline) {
+      // Bug #3: manualDepositInfo.commitment was undefined — now included in setManualDepositInfo
+      if (manualDepositInfo?.commitment && Date.now() >= manualDepositInfo.deadline) {
         try {
           const estimatedGas = await contract.f4e9b1a6.estimateGas(manualDepositInfo.commitment);
-          const totalFee = BigInt(estimatedGas) * BigInt(gasPrice);
+          const totalFee = BigInt(estimatedGas) * effectiveGasPrice;
           estimates[manualDepositInfo.commitment] = ethers.formatEther(totalFee);
         } catch (e) {
           estimates[manualDepositInfo.commitment] = 'Unknown';
         }
       }
 
-      setGasEstimates(estimates);
+      if (!cancelled) setGasEstimates(estimates);
     };
     estimateGas();
+    return () => { cancelled = true; };
   }, [activeDeposits, manualDepositInfo, signer]);
 
   const fetchUserDeposits = useCallback(async (userAddr: string) => {
@@ -1333,7 +1360,14 @@ function CancelTab({ tokens, signer, address, showToast }: any) {
 
       const active = [];
       for (const cmt of cmts) {
-        const status = await contract.b9f2d7c1(cmt);
+        // Bug #8: wrap each call individually so one bad commitment doesn't break all
+        let status;
+        try {
+          status = await contract.b9f2d7c1(cmt);
+        } catch (e) {
+          console.warn(`Skipping commitment ${cmt}:`, e);
+          continue;
+        }
         if (status[0] && !status[3] && !status[4]) {
           const tokenObj = tokens.find((t: any) => t.address.toLowerCase() === status[1].toLowerCase());
           const decimals = tokenObj ? tokenObj.decimals : 18;
@@ -1377,6 +1411,7 @@ function CancelTab({ tokens, signer, address, showToast }: any) {
             const decimals = tokenObj ? tokenObj.decimals : 18;
             const symbol = tokenObj ? tokenObj.symbol : 'Unknown';
             setManualDepositInfo({
+              commitment: manualCommitment, // Bug #3: include commitment for gas estimation lookup
               isDeposited: status[0],
               token: status[1],
               symbol,
@@ -1904,7 +1939,7 @@ function TokensTab({ tokens, balances, address }: any) {
 // -----------------------------------------------------------------------------
 // HISTORY TAB
 // -----------------------------------------------------------------------------
-function HistoryTab({ address, tokens }: any) {
+function HistoryTab({ address }: any) {
   const [history, setHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [filterType, setFilterType] = useState<'All' | 'Send' | 'Receive' | 'Refund'>('All');
@@ -1912,8 +1947,10 @@ function HistoryTab({ address, tokens }: any) {
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest' | 'amount_desc' | 'amount_asc'>('newest');
 
   useEffect(() => {
+    let mounted = true;
     const fetchHistory = async () => {
       if (!address) return;
+      if (!mounted) return;
       setLoading(true);
       try {
         const [txData, tokenData, internalData] = await Promise.all([
@@ -1923,11 +1960,11 @@ function HistoryTab({ address, tokens }: any) {
         ]);
 
         const hist: any[] = [];
-        const seenHashes = new Set();
 
         if (txData.status === "1") {
           for (const tx of txData.result) {
-            if (tx.to?.toLowerCase() === CONTRACT_ADDRESS.toLowerCase() && tx.isError === "0") {
+            // Bug #1: don't filter by isError here — include failed txs with correct status
+            if (tx.to?.toLowerCase() === CONTRACT_ADDRESS.toLowerCase()) {
               let type = 'Unknown';
               if (tx.input?.startsWith("0xa3f8c2d1") || tx.input?.startsWith("0xe1b5f9c3")) type = 'Send';
               else if (tx.input?.startsWith("0xd7a2c4f8")) type = 'Receive';
@@ -1946,7 +1983,6 @@ function HistoryTab({ address, tokens }: any) {
                   fee: ethers.formatEther(BigInt(tx.gasUsed || 0) * BigInt(tx.gasPrice || 0)),
                   status: tx.isError === "0" ? "Success" : "Failed"
                 });
-                seenHashes.add(tx.hash);
               }
             }
           }
@@ -1973,7 +2009,6 @@ function HistoryTab({ address, tokens }: any) {
                   fee: ethers.formatEther(BigInt(tx.gasUsed || 0) * BigInt(tx.gasPrice || 0)),
                   status: "Success"
                 });
-                seenHashes.add(tx.hash);
               }
             }
           }
@@ -2000,21 +2035,21 @@ function HistoryTab({ address, tokens }: any) {
                   fee: ethers.formatEther(BigInt(tx.gasUsed || 0) * BigInt(tx.gasPrice || 0)),
                   status: tx.isError === "0" ? "Success" : "Failed"
                 });
-                seenHashes.add(tx.hash);
               }
             }
           }
         }
 
         hist.sort((a, b) => b.timestamp - a.timestamp);
-        setHistory(hist);
+        if (mounted) setHistory(hist);
       } catch (e) {
         console.error("Failed to fetch history", e);
       } finally {
-        setLoading(false);
+        if (mounted) setLoading(false);
       }
     };
     fetchHistory();
+    return () => { mounted = false; };
   }, [address]);
 
   if (!address) {
@@ -2146,8 +2181,8 @@ function HistoryTab({ address, tokens }: any) {
                     </tr>
                   </thead>
                   <tbody>
-                    {filtered.map((tx, i) => (
-                      <tr key={i} className="bg-white border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                    {filtered.map((tx) => (
+                      <tr key={tx.hash} className="bg-white border-b border-gray-100 hover:bg-gray-50 transition-colors">
                         <td className="px-6 py-4 font-mono text-[#ff3300] hover:text-[#e62e00]">
                           <a href={`${EXPLORER_URL}/tx/${tx.hash}`} target="_blank" rel="noreferrer" className="flex items-center gap-1">
                             {tx.hash ? `${tx.hash.slice?.(0, 10) || tx.hash}...${tx.hash.slice?.(-8) || ''}` : 'Unknown'}
@@ -2221,7 +2256,7 @@ function HistoryTab({ address, tokens }: any) {
 function DocsTab() {
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="w-full h-full flex-1 flex flex-col">
-      <iframe src="/stealthtransfer.html" className="w-full flex-1 border-none min-h-[calc(100vh-64px)] md:min-h-[calc(100vh-80px)]" title="GhostPay Documentation" />
+      <iframe src="/stealthtransfer.html" sandbox="allow-scripts allow-same-origin" className="w-full flex-1 border-none min-h-[calc(100vh-64px)] md:min-h-[calc(100vh-80px)]" title="GhostPay Documentation" />
     </motion.div>
   );
 }
